@@ -6,21 +6,27 @@ import {
   HttpException,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { IUser } from './interfaces/user.interface';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { User as UserModel } from '@prisma/client';
 
 @Controller('/users/')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
   @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
+  async createUser(
+    @Body()
+    userData: {
+      firstName: string;
+      lastName: string;
+      isActive: boolean;
+    },
+  ): Promise<UserModel> {
     try {
-      await this.usersService.create(createUserDto);
+      return await this.usersService.createUser(userData);
     } catch (e) {
       throw new HttpException(
         {
@@ -35,22 +41,84 @@ export class UsersController {
     }
   }
   @Get()
-  async findAll(): Promise<IUser[]> {
-    return await this.usersService.findAll();
+  async findAll(): Promise<UserModel[]> {
+    try {
+      return await this.usersService.findAll();
+    } catch (e) {
+      throw new HttpException(
+        {
+          status: HttpStatus.FORBIDDEN,
+          error: 'Nenhum usuario encontrado',
+        },
+        HttpStatus.FORBIDDEN,
+        {
+          cause: e,
+        },
+      );
+    }
   }
   @Get(':idUser')
-  async findOne(@Param('idUser') idUser: number): Promise<IUser> {
-    return await this.usersService.findOne(idUser);
+  async findOne(
+    @Param('idUser', ParseIntPipe) idUser: number,
+  ): Promise<UserModel | null> {
+    try {
+      return await this.usersService.findOne(idUser);
+    } catch (e) {
+      throw new HttpException(
+        {
+          status: HttpStatus.FORBIDDEN,
+          error: 'Nenhum usuario encontrado',
+        },
+        HttpStatus.FORBIDDEN,
+        {
+          cause: e,
+        },
+      );
+    }
   }
+
   @Patch(':idUser')
   async update(
-    @Param('idUser') idUser: number,
-    @Body() updateUserDto: UpdateUserDto,
-  ): Promise<void> {
-    await this.usersService.update(idUser, updateUserDto);
+    @Param('idUser', ParseIntPipe) idUser: number,
+    @Body()
+    userData: {
+      firstName: string;
+      lastName: string;
+      isActive: boolean;
+    },
+  ): Promise<UserModel> {
+    try {
+      const where = { idUser };
+      const data = userData;
+      return await this.usersService.updateUser({ where, data });
+    } catch (e) {
+      throw new HttpException(
+        {
+          status: HttpStatus.FORBIDDEN,
+          error: 'Usuário não pode ser atualizado',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
   }
   @Delete(':idUser')
-  remove(@Param('idUser') idUser: number): Promise<void> {
-    return this.usersService.remove(idUser);
+  async remove(
+    @Param('idUser', ParseIntPipe) idUser: number,
+  ): Promise<UserModel> {
+    try {
+      const where = { idUser };
+      return this.usersService.deleteUser(where);
+    } catch (e) {
+      throw new HttpException(
+        {
+          status: HttpStatus.FORBIDDEN,
+          error: 'Usuário não pode ser excluído',
+        },
+        HttpStatus.FORBIDDEN,
+        {
+          cause: e,
+        },
+      );
+    }
   }
 }
